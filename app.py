@@ -336,6 +336,38 @@ def construct_generation_prompt(rubric_name, examples, city=None, previous_title
     
     rubric_prompt = '\n'.join(rubric_prompt_parts)
     
+    # Replace common.tags and common.cities placeholders with actual data
+    common_data = prompts.get('common', {})
+    if common_data:
+        tags_list = common_data.get('tags', [])
+        cities_list = common_data.get('cities', [])
+        
+        # Rubrics that require tags list
+        rubrics_requiring_tags = ['Tripo Finds (Collection)', 'Tripo Finds (Place)', 'Occasion']
+        
+        # Replace references to common.tags with actual tags list
+        if tags_list:
+            tags_text = '\n'.join([f'  - "{tag}"' for tag in tags_list])
+            
+            # Replace text references
+            rubric_prompt = rubric_prompt.replace('common.tags', 'the following tags list')
+            rubric_prompt = rubric_prompt.replace('the list', 'the following tags list')
+            rubric_prompt = rubric_prompt.replace('from the list', 'from the following tags list')
+            rubric_prompt = rubric_prompt.replace('from list', 'from the following tags list')
+            
+            # Always add tags list for rubrics that require it
+            if rubric_name in rubrics_requiring_tags or 'tag' in rubric_prompt.lower():
+                if 'AVAILABLE TAGS' not in rubric_prompt and 'tags list' not in rubric_prompt.lower():
+                    rubric_prompt += f"\n\nAVAILABLE TAGS (choose ONE tag per place):\n{tags_text}"
+        
+        # Replace references to common.cities with actual cities list
+        if cities_list:
+            cities_text = ', '.join(cities_list)
+            rubric_prompt = rubric_prompt.replace('common.cities', cities_text)
+            rubric_prompt = rubric_prompt.replace('the 4 cities', f'the 4 cities: {cities_text}')
+            rubric_prompt = rubric_prompt.replace('4 cities', f'4 cities: {cities_text}')
+            rubric_prompt = rubric_prompt.replace('one of the 4 cities', f'one of these 4 cities: {cities_text}')
+    
     # Debug: verify city replacement
     if city:
         city_trimmed = city.strip()
