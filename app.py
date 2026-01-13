@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, static_folder='public', static_url_path='')
+app = Flask(__name__)
 # Set secret key for sessions
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
@@ -521,19 +521,32 @@ def serve_css(filename):
     from flask import send_from_directory, Response
     import os
     
-    # Try to serve from public directory
-    public_path = os.path.join(os.path.dirname(__file__), 'public', 'css')
+    # Get the base directory (project root)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_path = os.path.join(base_dir, 'public', 'css')
     file_path = os.path.join(public_path, filename)
     
+    # Debug logging
+    print(f"Attempting to serve CSS: {filename}")
+    print(f"Public path: {public_path}")
+    print(f"File path: {file_path}")
+    print(f"File exists: {os.path.exists(file_path)}")
+    
     if os.path.exists(file_path):
-        response = send_from_directory(public_path, filename)
-        # Add proper content type and cache headers
-        response.headers['Content-Type'] = 'text/css; charset=utf-8'
-        response.headers['Cache-Control'] = 'public, max-age=31536000'
-        return response
+        try:
+            response = send_from_directory(public_path, filename)
+            response.headers['Content-Type'] = 'text/css; charset=utf-8'
+            response.headers['Cache-Control'] = 'public, max-age=31536000'
+            return response
+        except Exception as e:
+            print(f"Error serving file: {e}")
+            return Response(f'Error: {str(e)}', status=500, mimetype='text/plain')
     else:
-        # Return 404 if file doesn't exist
-        return Response('File not found', status=404, mimetype='text/plain')
+        # List available files for debugging
+        if os.path.exists(public_path):
+            available_files = os.listdir(public_path)
+            print(f"Available files in {public_path}: {available_files}")
+        return Response(f'File not found: {filename}', status=404, mimetype='text/plain')
 
 
 @app.route('/')
