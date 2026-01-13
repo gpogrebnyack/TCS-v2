@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'edit' %}Edit Rubric{% else %}Add Rubric{% endif %} - Tripo Content Studio{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+<div class="form-container">
+<div class="form-header">
+        <h1 class="form-title">
+            {% if mode == 'edit' %}Edit Rubric{% else %}Add Rubric{% endif %}
+        </h1>
+        <div class="form-actions">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                <i class="ph-duotone ph-arrow-left"></i>
+                Back
+            </a>
+        </div>
+    </div>
+
+    {% if errors %}
+        <div class="error-flash">
+            <ul class="error-list">
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="POST" action="{% if mode == 'edit' %}{{ url_for('admin_edit_rubric', rubric_name=original_name) }}{% else %}{{ url_for('admin_add_rubric') }}{% endif %}">
+        <div class="form-group">
+            <label for="name" class="form-label">Rubric Name *</label>
+            <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                class="form-input" 
+                value="{{ form_data.name or '' }}"
+                placeholder="e.g., City Today"
+                required
+            />
+            <div class="form-hint">Unique rubric name</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Icon</label>
+            <div class="icon-picker-wrapper">
+                <input type="hidden" id="icon" name="icon" value="{{ form_data.icon or '' }}" />
+                <div class="icon-grid" id="iconGrid"></div>
+            </div>
+            <div class="form-hint">Select an icon from Phosphor Icons.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="title_prompt" class="form-label">Title Prompt</label>
+            <textarea 
+                id="title_prompt" 
+                name="title_prompt" 
+                class="form-textarea"
+                placeholder="Example: Generate a documentary-style title: '{city}, {month} {year}' with optional weather/time detail..."
+            >{{ form_data.title_prompt or '' }}</textarea>
+            <div class="form-hint">Prompt for generating the title. You can use placeholders: {city}, {City}, {CITY}, {Month}, {Year}</div>
+        </div>
+
+        <div class="form-group">
+            <label for="post_prompt" class="form-label">Post Prompt</label>
+            <textarea 
+                id="post_prompt" 
+                name="post_prompt" 
+                class="form-textarea"
+                placeholder="Example: Generate day itinerary with this EXACT structure:..."
+            >{{ form_data.post_prompt or '' }}</textarea>
+            <div class="form-hint">Prompt for generating post text. Describe the structure and format of the desired content.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Media Prompt Type</label>
+            <div class="prompt-type-toggle" id="promptTypeToggle">
+                <button type="button" class="prompt-type-option" data-type="image" id="promptTypeImage">
+                    <i class="ph-duotone ph-image"></i>
+                    Image Prompt
+                </button>
+                <button type="button" class="prompt-type-option" data-type="video" id="promptTypeVideo">
+                    <i class="ph-duotone ph-video"></i>
+                    Video Prompt
+                </button>
+            </div>
+            <input type="hidden" id="promptType" name="prompt_type" value="{% if form_data.get('video_prompt') and form_data.video_prompt.strip() %}video{% else %}image{% endif %}" />
+            
+            <div class="prompt-field-wrapper{% if not (form_data.get('video_prompt') and form_data.video_prompt.strip()) %} active{% endif %}" id="imagePromptWrapper">
+                <label for="image_prompt" class="form-label form-label-spaced">Image Prompt</label>
+                <textarea 
+                    id="image_prompt" 
+                    name="image_prompt" 
+                    class="form-textarea"
+                    placeholder="Example: Generate image prompt following this structure: '{Specific location/scene}...'"
+                >{{ form_data.image_prompt or '' }}</textarea>
+                <div class="form-hint">Prompt for generating image description. Leave empty or use '—' if not needed.</div>
+            </div>
+
+            <div class="prompt-field-wrapper{% if form_data.get('video_prompt') and form_data.video_prompt.strip() %} active{% endif %}" id="videoPromptWrapper">
+                <label for="video_prompt" class="form-label form-label-spaced">Video Prompt</label>
+                <textarea 
+                    id="video_prompt" 
+                    name="video_prompt" 
+                    class="form-textarea"
+                    placeholder="Example: Generate video prompt for 8-second clip: '{Description of camera movement}...'"
+                >{{ form_data.video_prompt or '' }}</textarea>
+                <div class="form-hint">Prompt for generating video description.</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="additional" class="form-label">Additional</label>
+            <textarea 
+                id="additional" 
+                name="additional" 
+                class="form-textarea"
+                placeholder="Example: CRITICAL: City name MUST be identical in title and image prompt..."
+            >{{ form_data.additional or '' }}</textarea>
+            <div class="form-hint">Additional instructions and requirements for content generation</div>
+        </div>
+
+        <div class="form-actions form-actions-spaced">
+            <button type="submit" class="btn btn-primary">
+                <i class="ph-duotone ph-floppy-disk"></i>
+                {% if mode == 'edit' %}Save Changes{% else %}Create Rubric{% endif %}
+            </button>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Popular Phosphor Icons for rubrics
+    // Verified Phosphor Icons that exist in v2.1.2
+    // Removed potentially non-existent icons: notification, flag-checkered, world, whatsapp-logo, telegram-logo, party-popper, fork-knife
+    const popularIcons = [
+        'map-pin', 'calendar-blank', 'calendar-dots', 'camera', 'lightbulb', 'question', 'confetti', 'sparkle', 'push-pin', 'stack', 'house', 'sign-out', 'arrow-left', 'floppy-disk', 'pencil', 'trash', 'plus', 'folder', 'folder-open', 'airplane', 'airplane-takeoff', 'airplane-landing', 'map-trifold', 'compass', 'megaphone', 'images', 'calendar', 'clock', 'timer', 'bell-ringing', 'hourglass', 'alarm', 'star', 'heart', 'bookmark', 'tag', 'magnifying-glass', 'binoculars', 'eye', 'eye-slash', 'bell', 'music-note', 'music-notes', 'microphone', 'coffee', 'wine', 'cake', 'car', 'bus', 'train', 'bicycle', 'scooter', 'building', 'buildings', 'storefront', 'warehouse', 'tree', 'sun', 'moon', 'cloud', 'waves', 'umbrella', 'suitcase', 'users', 'user', 'user-circle', 'user-plus', 'chat', 'chat-circle', 'envelope', 'paper-plane', 'globe', 'planet', 'flag', 'fire', 'lightning', 'rainbow', 'snowflake', 'gift', 'balloon', 'graph', 'wallet', 'credit-card', 'money', 'coins', 'lock', 'key', 'shield', 'shield-check', 'gear', 'paint-brush', 'palette', 'paint-bucket', 'highlighter', 'book', 'book-open', 'notebook', 'file-text', 'video', 'video-camera', 'film-strip', 'play', 'pause', 'stop', 'skip-forward', 'skip-back', 'phone', 'phone-call'
+    ].filter(icon => icon && icon.trim() !== '');
+
+    let allIcons = [...popularIcons];
+    let selectedIcon = '{{ form_data.icon or "" }}';
+
+    // Initialize icon picker
+    function initIconPicker() {
+        const iconGrid = document.getElementById('iconGrid');
+        const iconInput = document.getElementById('icon');
+
+        function renderIcons(icons) {
+            iconGrid.innerHTML = '';
+            icons.forEach(iconName => {
+                if (!iconName || iconName.trim() === '') return;
+                
+                const iconItem = document.createElement('div');
+                iconItem.className = 'icon-item' + (iconName === selectedIcon ? ' selected' : '');
+                iconItem.onclick = () => selectIcon(iconName, iconItem);
+                iconItem.setAttribute('data-icon', iconName);
+                
+                const iconElement = document.createElement('i');
+                iconElement.className = `ph-duotone ph-${iconName} icon-item-icon`;
+                iconElement.setAttribute('aria-hidden', 'true');
+                
+                iconItem.appendChild(iconElement);
+                iconGrid.appendChild(iconItem);
+            });
+        }
+
+        function selectIcon(iconName, element) {
+            selectedIcon = iconName;
+            iconInput.value = iconName;
+            
+            // Update grid selection
+            document.querySelectorAll('.icon-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            if (element) {
+                element.classList.add('selected');
+            }
+        }
+
+        // Initial render
+        renderIcons(allIcons);
+        
+        // Verify icons are rendered
+        setTimeout(() => {
+            const renderedIcons = document.querySelectorAll('.icon-item');
+            console.log(`Rendered ${renderedIcons.length} icons out of ${allIcons.length} total`);
+        }, 100);
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initIconPicker);
+    } else {
+        initIconPicker();
+    }
+
+    // Prompt type toggle
+    function initPromptTypeToggle() {
+        const promptTypeInput = document.getElementById('promptType');
+        const imageOption = document.getElementById('promptTypeImage');
+        const videoOption = document.getElementById('promptTypeVideo');
+        const imageWrapper = document.getElementById('imagePromptWrapper');
+        const videoWrapper = document.getElementById('videoPromptWrapper');
+        const imagePromptField = document.getElementById('image_prompt');
+        const videoPromptField = document.getElementById('video_prompt');
+
+        // Determine initial state - check if video_prompt has content
+        const hasVideoPrompt = videoPromptField && videoPromptField.value && videoPromptField.value.trim() !== '';
+        const currentType = promptTypeInput.value || (hasVideoPrompt ? 'video' : 'image');
+
+        function setPromptType(type) {
+            promptTypeInput.value = type;
+            
+            if (type === 'video') {
+                imageOption.classList.remove('active');
+                videoOption.classList.add('active');
+                imageWrapper.classList.remove('active');
+                videoWrapper.classList.add('active');
+                // Only submit the active field
+                imagePromptField.removeAttribute('name');
+                videoPromptField.setAttribute('name', 'video_prompt');
+            } else {
+                videoOption.classList.remove('active');
+                imageOption.classList.add('active');
+                videoWrapper.classList.remove('active');
+                imageWrapper.classList.add('active');
+                // Only submit the active field
+                videoPromptField.removeAttribute('name');
+                imagePromptField.setAttribute('name', 'image_prompt');
+            }
+        }
+
+        imageOption.addEventListener('click', () => setPromptType('image'));
+        videoOption.addEventListener('click', () => setPromptType('video'));
+
+        // Set initial state
+        setPromptType(currentType);
+    }
+
+    // Initialize prompt type toggle
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPromptTypeToggle);
+    } else {
+        initPromptTypeToggle();
+    }
+</script>
+{% endblock %}

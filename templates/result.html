@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Generated Content - Tripo Content Studio{% endblock %}
+
+{% block loading_text %}Regenerating content...{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+<!-- Result Header with Parameters -->
+<div class="result-header">
+    <h2 class="result-title">Generated Result</h2>
+    <div class="result-params" id="resultParams">
+        <!-- Parameters will be inserted here by JavaScript -->
+    </div>
+</div>
+
+<div id="contentContainer" class="content-card">
+    <!-- Content will be inserted here by JavaScript -->
+</div>
+
+<!-- Action Buttons -->
+<div class="actions">
+    <button id="tryAgainBtn" class="btn btn-primary">
+        Try Again
+    </button>
+    <button id="saveBtn" class="btn btn-secondary">
+        Save Post
+    </button>
+    <button id="backBtn" class="btn btn-outline">
+        Back to Topics
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Success Message -->
+<div id="successMessage" class="success-message">
+    Post saved successfully!
+</div>
+
+<script>
+    let currentContent = null;
+    let currentRubric = null;
+    let currentCity = null;
+
+    // Rubrics that don't require city
+    const rubricsWithoutCity = [
+        'Best Prompts',
+        'The Ask',
+        'Tripo Horoscope',
+        'Occasion'
+    ];
+
+    function rubricRequiresCity(rubricName) {
+        return !rubricsWithoutCity.includes(rubricName);
+    }
+
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const errorMessage = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+    const successMessage = document.getElementById('successMessage');
+    const contentContainer = document.getElementById('contentContainer');
+    const resultParams = document.getElementById('resultParams');
+    const tryAgainBtn = document.getElementById('tryAgainBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const backBtn = document.getElementById('backBtn');
+
+    function showError(message) {
+        errorText.textContent = message;
+        errorMessage.classList.add('show');
+        setTimeout(() => {
+            errorMessage.classList.remove('show');
+        }, 5000);
+    }
+
+    function showLoading() {
+        loadingOverlay.classList.add('active');
+    }
+
+    function hideLoading() {
+        loadingOverlay.classList.remove('active');
+    }
+
+    function showSuccess() {
+        successMessage.classList.add('show');
+        setTimeout(() => {
+            successMessage.classList.remove('show');
+        }, 3000);
+    }
+
+    function displayContent(content) {
+        currentContent = content;
+        currentRubric = content.rubric;
+        currentCity = content.city || null;
+        
+        // Display parameters
+        if (resultParams) {
+            const cityValue = currentCity ? escapeHtml(currentCity) : '—';
+            const rubricValue = currentRubric ? escapeHtml(currentRubric) : '—';
+            
+            resultParams.innerHTML = `
+                <div class="param-item">
+                    <span class="param-label">City:</span>
+                    <span class="param-value">${cityValue}</span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Rubric:</span>
+                    <span class="param-value">${rubricValue}</span>
+                </div>
+            `;
+        }
+        
+        const promptLabel = content.prompt_type === 'video' ? 'Prompt for Video' : 'Prompt for Image';
+        
+        contentContainer.innerHTML = `
+            <div class="content-section">
+                <h2>Title</h2>
+                <div class="content title-content">${escapeHtml(content.title)}</div>
+            </div>
+            
+            <div class="content-section">
+                <h2>Text for Post</h2>
+                <div class="content content-block">${escapeHtml(content.post_text)}</div>
+            </div>
+            
+            <div class="content-section">
+                <h2>${promptLabel}</h2>
+                <div class="content content-block">${escapeHtml(content.image_prompt)}</div>
+            </div>
+        `;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Load content from sessionStorage
+    window.addEventListener('DOMContentLoaded', () => {
+        const storedContent = sessionStorage.getItem('generatedContent');
+        if (storedContent) {
+            try {
+                const content = JSON.parse(storedContent);
+                displayContent(content);
+            } catch (e) {
+                showError('Failed to load content. Please go back and try again.');
+            }
+        } else {
+            showError('No content found. Please go back and generate content first.');
+        }
+    });
+
+    // Try Again button
+    tryAgainBtn.addEventListener('click', async () => {
+        if (!currentRubric) {
+            showError('No rubric selected. Please go back and try again.');
+            return;
+        }
+
+        const requiresCity = rubricRequiresCity(currentRubric);
+        
+        // Check city only if rubric requires it
+        if (requiresCity) {
+            // Check if we have a city
+            if (!currentCity) {
+                // Try to get from sessionStorage as fallback
+                const storedContent = sessionStorage.getItem('generatedContent');
+                if (storedContent) {
+                    try {
+                        const content = JSON.parse(storedContent);
+                        currentCity = content.city || null;
+                    } catch (e) {
+                        // Ignore
+                    }
+                }
+            }
+
+            if (!currentCity || !currentCity.trim()) {
+                showError('City is required. Please go back and enter a city first.');
+                return;
+            }
+        }
+
+        showLoading();
+
+        try {
+            const requestBody = { 
+                rubric: currentRubric
+            };
+            
+            // Add city only if rubric requires it
+            if (requiresCity && currentCity) {
+                requestBody.city = currentCity.trim();
+            }
+            
+            // Add previous title for diversity (especially for Occasion)
+            if (currentContent && currentContent.title) {
+                requestBody.previous_title = currentContent.title;
+            }
+
+            const response = await fetch('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Generation failed');
+            }
+
+            // Save city along with new generated content (if provided)
+            if (requiresCity && currentCity) {
+                data.city = currentCity;
+            }
+            data.rubric = currentRubric;
+            displayContent(data);
+            sessionStorage.setItem('generatedContent', JSON.stringify(data));
+            hideLoading();
+            
+        } catch (error) {
+            hideLoading();
+            showError(error.message || 'Failed to regenerate content. Please try again.');
+        }
+    });
+
+    // Save button
+    saveBtn.addEventListener('click', async () => {
+        if (!currentContent) {
+            showError('No content to save.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rubric: currentContent.rubric,
+                    title: currentContent.title,
+                    post_text: currentContent.post_text,
+                    image_prompt: currentContent.image_prompt
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Save failed');
+            }
+
+            showSuccess();
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+            
+        } catch (error) {
+            showError(error.message || 'Failed to save post. Please try again.');
+        }
+    });
+
+    // Back button
+    backBtn.addEventListener('click', () => {
+        window.location.href = '/';
+    });
+</script>
+{% endblock %}

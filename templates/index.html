@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Tripo Content Studio{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+<!-- Main Layout -->
+<div class="main-layout">
+    <!-- Left Section: Enter City -->
+    <section class="section">
+        <h2 class="section-title">Enter city</h2>
+        <div class="city-input-wrapper">
+            <input 
+                type="text" 
+                id="cityInput" 
+                placeholder="Istanbul, Barcelona, New York..." 
+                class="city-input"
+                autocomplete="off"
+            />
+        </div>
+        <div id="cityStatus" class="city-status"></div>
+    </section>
+
+    <!-- Right Section: Choose Topic -->
+    <section class="section">
+        <h2 class="section-title">Choose topic</h2>
+        <div class="topics-grid">
+            {% if rubrics %}
+                {% for rubric_name, rubric_data in rubrics.items() %}
+                    <div class="topic-item" data-rubric="{{ rubric_name }}">
+                        {% if rubric_data.icon %}
+                            <i class="ph-duotone ph-{{ rubric_data.icon }} topic-icon"></i>
+                        {% else %}
+                            <i class="ph-duotone ph-folder topic-icon"></i>
+                        {% endif %}
+                        <span class="topic-text">{{ rubric_name }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state-message">
+                    No rubrics found. Please add rubrics through the admin panel.
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize variables
+    let rubricCards, loadingOverlay, errorMessage, errorText;
+    let cityInput, cityStatus;
+
+    // Rubrics that don't require city
+    const rubricsWithoutCity = [
+        'Best Prompts',
+        'The Ask',
+        'Tripo Horoscope',
+        'Occasion'
+    ];
+
+    function rubricRequiresCity(rubricName) {
+        if (!rubricName) return true; // Default to requiring city if rubric name is missing
+        return !rubricsWithoutCity.includes(rubricName);
+    }
+
+    function showError(message) {
+        if (errorText && errorMessage) {
+            errorText.textContent = message;
+            errorMessage.classList.add('show');
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 5000);
+        } else {
+            console.error('Error:', message);
+        }
+    }
+
+    function showLoading() {
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('active');
+        }
+    }
+
+    function hideLoading() {
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('active');
+        }
+    }
+
+    function validateCity(cityName) {
+        if (!cityName || cityName.trim().length < 2) {
+            return { valid: false, error: 'Please enter a city name (at least 2 characters)' };
+        }
+        return { valid: true, city: cityName.trim() };
+    }
+
+    function handleCityInputChange() {
+        if (!cityInput) return;
+        
+        const cityName = cityInput.value.trim();
+        
+        if (rubricCards && rubricCards.length > 0) {
+            rubricCards.forEach(card => {
+                const rubric = card.dataset.rubric;
+                const requiresCity = rubricRequiresCity(rubric);
+                
+                if (requiresCity) {
+                    // Enable/disable based on city input
+                    if (cityName.length >= 2) {
+                        card.classList.remove('disabled');
+                    } else {
+                        card.classList.add('disabled');
+                    }
+                } else {
+                    // Always enable rubrics that don't require city
+                    card.classList.remove('disabled');
+                }
+            });
+        }
+        
+        if (cityStatus) {
+            cityStatus.textContent = '';
+        }
+    }
+
+    function initializeRubricCards() {
+        if (!rubricCards || rubricCards.length === 0) {
+            console.error('Rubric cards not found');
+            return;
+        }
+
+        rubricCards.forEach(card => {
+            card.addEventListener('click', async function() {
+                const rubric = this.dataset.rubric;
+                const requiresCity = rubricRequiresCity(rubric);
+                
+                let cityToUse = null;
+                
+                // Check city only if rubric requires it
+                if (requiresCity) {
+                    if (!cityInput) {
+                        showError('City input not initialized');
+                        return;
+                    }
+                    
+                    const cityName = cityInput.value.trim();
+                    
+                    if (!cityName) {
+                        showError('Please enter a city name first');
+                        cityInput.focus();
+                        return;
+                    }
+
+                    const validation = validateCity(cityName);
+                    if (!validation.valid) {
+                        showError(validation.error);
+                        cityInput.focus();
+                        return;
+                    }
+                    
+                    cityToUse = validation.city;
+                }
+                
+                console.log('Generating content:', { rubric: rubric, city: cityToUse });
+                
+                showLoading();
+                
+                try {
+                    const requestBody = { rubric: rubric };
+                    if (cityToUse) {
+                        requestBody.city = cityToUse;
+                    }
+                    console.log('Request body:', requestBody);
+                    
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Generation failed');
+                    }
+
+                    // Save city along with generated content (if provided)
+                    if (cityToUse) {
+                        data.city = cityToUse;
+                    }
+                    sessionStorage.setItem('generatedContent', JSON.stringify(data));
+                    window.location.href = '/result';
+                    
+                } catch (error) {
+                    hideLoading();
+                    showError(error.message || 'Failed to generate content. Please try again.');
+                }
+            });
+        });
+    }
+
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializePage);
+    } else {
+        // DOM is already ready
+        initializePage();
+    }
+
+    function initializePage() {
+        try {
+            console.log('Initializing page...');
+            rubricCards = document.querySelectorAll('.topic-item');
+            loadingOverlay = document.getElementById('loadingOverlay');
+            errorMessage = document.getElementById('errorMessage');
+            errorText = document.getElementById('errorText');
+            cityInput = document.getElementById('cityInput');
+            cityStatus = document.getElementById('cityStatus');
+            
+            console.log('Elements found:', {
+                rubricCards: rubricCards ? rubricCards.length : 0,
+                loadingOverlay: !!loadingOverlay,
+                errorMessage: !!errorMessage,
+                cityInput: !!cityInput
+            });
+            
+            if (!rubricCards || rubricCards.length === 0) {
+                console.error('Rubric cards not found');
+            }
+            
+            if (cityInput) {
+                cityInput.addEventListener('input', handleCityInputChange);
+            } else {
+                console.error('City input not found');
+            }
+            
+            initializeRubricCards();
+            
+            // Initially disable only rubrics that require city
+            if (rubricCards && rubricCards.length > 0) {
+                rubricCards.forEach(card => {
+                    const rubric = card.dataset.rubric;
+                    if (rubric && rubricRequiresCity(rubric)) {
+                        card.classList.add('disabled');
+                    }
+                });
+            }
+            
+            console.log('Page initialized successfully');
+        } catch (error) {
+            console.error('Error initializing page:', error);
+            // Show error to user if possible
+            if (typeof showError === 'function') {
+                showError('Failed to initialize page. Please refresh.');
+            }
+        }
+    }
+</script>
+{% endblock %}

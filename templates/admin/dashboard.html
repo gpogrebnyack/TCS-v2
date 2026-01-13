@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Tripo Content Studio{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+<!-- Rubrics Management Section -->
+<div class="admin-header">
+    <h1 class="form-title">Rubrics Management</h1>
+    <div class="admin-actions">
+        <a href="{{ url_for('admin_add_rubric') }}" class="btn btn-primary">
+            <i class="ph-duotone ph-plus-circle"></i>
+            Add Rubric
+        </a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="{% if category == 'success' %}success-flash{% else %}error-flash{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+{% if rubrics %}
+    <div class="rubrics-list">
+        {% for rubric_name, rubric_data in rubrics.items() %}
+            <div class="rubric-card">
+                <div class="rubric-info">
+                    {% if rubric_data.icon %}
+                        <i class="ph-duotone ph-{{ rubric_data.icon }} rubric-icon"></i>
+                    {% else %}
+                        <i class="ph-duotone ph-folder rubric-icon"></i>
+                    {% endif %}
+                    <span class="rubric-name">{{ rubric_name }}</span>
+                </div>
+                <div class="rubric-actions">
+                    <a href="{{ url_for('admin_edit_rubric', rubric_name=rubric_name) }}" class="btn btn-secondary">
+                        <i class="ph-duotone ph-pencil"></i>
+                        Edit
+                    </a>
+                    <form method="POST" action="{{ url_for('admin_delete_rubric', rubric_name=rubric_name) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete the rubric «{{ rubric_name }}»?');">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="ph-duotone ph-trash"></i>
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <i class="ph-duotone ph-folder-open empty-state-icon"></i>
+        <p>No rubrics found. Add your first rubric.</p>
+    </div>
+{% endif %}
+{% endblock %}
