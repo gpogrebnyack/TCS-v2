@@ -338,12 +338,12 @@ def construct_generation_prompt(rubric_name, examples, city=None, previous_title
     
     # Replace common.tags and common.cities placeholders with actual data
     common_data = prompts.get('common', {})
+    # Rubrics that require tags list
+    rubrics_requiring_tags = ['Tripo Finds (Collection)', 'Tripo Finds (Place)', 'Occasion']
+    
     if common_data:
         tags_list = common_data.get('tags', [])
         cities_list = common_data.get('cities', [])
-        
-        # Rubrics that require tags list
-        rubrics_requiring_tags = ['Tripo Finds (Collection)', 'Tripo Finds (Place)', 'Occasion']
         
         # Replace references to common.tags with actual tags list
         if tags_list:
@@ -357,8 +357,17 @@ def construct_generation_prompt(rubric_name, examples, city=None, previous_title
             
             # Always add tags list for rubrics that require it
             if rubric_name in rubrics_requiring_tags or 'tag' in rubric_prompt.lower():
-                if 'AVAILABLE TAGS' not in rubric_prompt and 'tags list' not in rubric_prompt.lower():
-                    rubric_prompt += f"\n\nAVAILABLE TAGS (choose ONE tag per place):\n{tags_text}"
+                # Check if tags list is already in prompt
+                if 'AVAILABLE TAGS' not in rubric_prompt:
+                    if rubric_name == 'Tripo Finds (Collection)':
+                        rubric_prompt += f"\n\n=== AVAILABLE TAGS (CRITICAL - USE ONLY THESE) ===\nYou MUST use ONLY the tags from this list. Choose ONE tag per place. Each tag must be written EXACTLY as shown (including emojis, capitalization, and punctuation). Do NOT create your own tags like 'local_food', 'history', 'culture', 'nature' - these are NOT valid.\n\n{tags_text}\n\nFormat for each place: **Place Name** — Description. Tag: [exact tag from list above]"
+                    elif rubric_name == 'Tripo Finds (Place)':
+                        rubric_prompt += f"\n\nAVAILABLE TAGS (choose ONE tag):\n{tags_text}"
+                    else:
+                        rubric_prompt += f"\n\nAVAILABLE TAGS (choose ONE tag per place):\n{tags_text}"
+                elif rubric_name == 'Tripo Finds (Collection)':
+                    # If tags are already mentioned but not clearly listed, add explicit list
+                    rubric_prompt += f"\n\n=== AVAILABLE TAGS (CRITICAL - USE ONLY THESE) ===\n{tags_text}\n\nRemember: Use ONLY these tags. Do NOT create your own tags."
         
         # Replace references to common.cities with actual cities list
         if cities_list:
@@ -463,11 +472,16 @@ def construct_generation_prompt(rubric_name, examples, city=None, previous_title
     else:
         instruction_text = "Generate new content following the rubric prompt instructions above."
     
+    # Add special tag instruction for rubrics requiring tags
+    tag_instruction = ""
+    if rubric_name in rubrics_requiring_tags and common_data and common_data.get('tags'):
+        tag_instruction = "\n\nCRITICAL FOR TAGS: You MUST use ONLY the tags from the AVAILABLE TAGS list provided above. Each tag must be written EXACTLY as shown (including emojis, capitalization, and punctuation). Do NOT create your own tags or modify the tags from the list."
+    
     user_prompt = f"""You are generating content for the "{rubric_name}" rubric.{city_info}{month_year_instruction}
 RUBRIC PROMPT:
 {rubric_prompt}{examples_text}
 
-{instruction_text}{city_instruction} Return ONLY valid JSON with these fields:
+{instruction_text}{city_instruction}{tag_instruction} Return ONLY valid JSON with these fields:
 {{
   "title": "...",
   "post_text": "...",
