@@ -1309,12 +1309,26 @@ def admin_delete_rubric(rubric_name):
         flash(f'Rubric "{rubric_name}" not found', 'error')
         return redirect(url_for('admin_dashboard'))
     
-    del rubrics[rubric_name]
-    
-    if save_prompts(prompts):
-        flash(f'Rubric "{rubric_name}" successfully deleted', 'success')
+    # Delete from Supabase if available
+    if USE_SUPABASE and supabase:
+        try:
+            result = supabase.table('rubrics').delete().eq('name', rubric_name).execute()
+            print(f"Deleted rubric '{rubric_name}' from Supabase")
+            # Clear cached prompts_data to force reload from Supabase
+            global prompts_data
+            prompts_data = None
+            flash(f'Rubric "{rubric_name}" successfully deleted', 'success')
+        except Exception as e:
+            print(f"Error deleting rubric from Supabase: {e}")
+            flash(f'Error deleting rubric from database: {e}', 'error')
+            return redirect(url_for('admin_dashboard'))
     else:
-        flash('Error deleting rubric', 'error')
+        # File-based storage: remove from local dictionary and save
+        del rubrics[rubric_name]
+        if save_prompts(prompts):
+            flash(f'Rubric "{rubric_name}" successfully deleted', 'success')
+        else:
+            flash('Error deleting rubric', 'error')
     
     return redirect(url_for('admin_dashboard'))
 
