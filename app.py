@@ -483,9 +483,17 @@ def call_openrouter_api(system_prompt, user_prompt):
         raise ValueError("OPENROUTER_API_KEY not set in environment")
     
     url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    # Get referer URL from environment or use default
+    referer_url = os.getenv('VERCEL_URL') or os.getenv('APP_URL') or 'http://localhost:5001'
+    if not referer_url.startswith('http'):
+        referer_url = f'https://{referer_url}'
+    
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": referer_url,
+        "X-Title": "Tripo Content Studio"
     }
     
     # Add temperature for more diversity, especially for Occasion rubric
@@ -502,7 +510,18 @@ def call_openrouter_api(system_prompt, user_prompt):
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
+        
+        # Better error handling
+        if response.status_code != 200:
+            error_detail = "Unknown error"
+            try:
+                error_data = response.json()
+                error_detail = error_data.get('error', {}).get('message', str(error_data))
+            except:
+                error_detail = response.text[:500]  # First 500 chars of error
+        
+            raise Exception(f"OpenRouter API error ({response.status_code}): {error_detail}")
+        
         result = response.json()
         
         # Extract content from response
