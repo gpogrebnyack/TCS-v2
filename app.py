@@ -615,7 +615,9 @@ def index():
     try:
         prompts = load_prompts()
         rubrics = prompts.get('rubrics', {})
-        return render_template('index.html', rubrics=rubrics)
+        # Sort rubrics alphabetically by name
+        sorted_rubrics = dict(sorted(rubrics.items(), key=lambda x: x[0].lower()))
+        return render_template('index.html', rubrics=sorted_rubrics)
     except Exception as e:
         print(f"Error rendering index.html: {e}")
         return f"Error loading page: {str(e)}", 500
@@ -1136,7 +1138,9 @@ def admin_dashboard():
     """Admin dashboard with list of rubrics"""
     prompts = load_prompts()
     rubrics = prompts.get('rubrics', {})
-    return render_template('admin/dashboard.html', rubrics=rubrics)
+    # Sort rubrics alphabetically by name
+    sorted_rubrics = dict(sorted(rubrics.items(), key=lambda x: x[0].lower()))
+    return render_template('admin/dashboard.html', rubrics=sorted_rubrics)
 
 
 @app.route('/admin/rubric/add', methods=['GET', 'POST'])
