@@ -5,6 +5,7 @@ import requests
 import secrets
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+from urllib.parse import unquote
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from dotenv import load_dotenv
 
@@ -1194,6 +1195,9 @@ def admin_add_rubric():
 @admin_required
 def admin_edit_rubric(rubric_name):
     """Edit existing rubric"""
+    # Decode URL-encoded rubric name (e.g., "City%20Today" -> "City Today")
+    rubric_name = unquote(rubric_name)
+    
     prompts = load_prompts()
     rubrics = prompts.get('rubrics', {})
     
@@ -1295,6 +1299,9 @@ def admin_edit_rubric(rubric_name):
 @admin_required
 def admin_delete_rubric(rubric_name):
     """Delete rubric"""
+    # Decode URL-encoded rubric name (e.g., "City%20Today" -> "City Today")
+    rubric_name = unquote(rubric_name)
+    
     prompts = load_prompts()
     rubrics = prompts.get('rubrics', {})
     
