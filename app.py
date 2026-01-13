@@ -518,7 +518,7 @@ def call_openrouter_api(system_prompt, user_prompt):
 @app.route('/css/<path:filename>')
 def serve_css(filename):
     """Serve CSS files from public directory for local development and Vercel"""
-    from flask import send_from_directory, Response
+    from flask import send_from_directory, Response, make_response
     import os
     
     # Get the base directory (project root)
@@ -526,26 +526,20 @@ def serve_css(filename):
     public_path = os.path.join(base_dir, 'public', 'css')
     file_path = os.path.join(public_path, filename)
     
-    # Debug logging
-    print(f"Attempting to serve CSS: {filename}")
-    print(f"Public path: {public_path}")
-    print(f"File path: {file_path}")
-    print(f"File exists: {os.path.exists(file_path)}")
-    
     if os.path.exists(file_path):
         try:
-            response = send_from_directory(public_path, filename)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                css_content = f.read()
+            
+            response = make_response(css_content)
             response.headers['Content-Type'] = 'text/css; charset=utf-8'
-            response.headers['Cache-Control'] = 'public, max-age=31536000'
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            response.headers['Access-Control-Allow-Origin'] = '*'
             return response
         except Exception as e:
-            print(f"Error serving file: {e}")
+            print(f"Error serving CSS file: {e}")
             return Response(f'Error: {str(e)}', status=500, mimetype='text/plain')
     else:
-        # List available files for debugging
-        if os.path.exists(public_path):
-            available_files = os.listdir(public_path)
-            print(f"Available files in {public_path}: {available_files}")
         return Response(f'File not found: {filename}', status=404, mimetype='text/plain')
 
 
